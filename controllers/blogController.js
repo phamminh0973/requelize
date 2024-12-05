@@ -11,23 +11,29 @@ controller.init =async(req,res,next) => {
 }
 
 controller.showList = async (req, res) => {
-    let {category =0, tag =0, keyword= ""} = req.query;
+    let limit=2;
+    let {category =0, tag =0, keyword= "", page = 1 } = req.query;
     category = isNaN(category) ? 0 : parseInt(category);
     tag = isNaN(tag) ? 0 : parseInt(tag);
+    page = isNaN(page) ? 1 : parseInt(page);
+    let offset = (page - 1) * limit;
 
     let options = {
         include: [{model: models.Comment }],
         where: {},
     };
 
+    // Neu nguoi dung loc category thi loc blog theo category
     if (category) {
         options.where.categoryId = category;
     }
 
+    // Neu nguoi dung loc tag thi loc blog theo tag
     if (tag) {
         options.include.push({model: models.Tag, where: { id: tag } });
     }
-
+    
+    // Neu nguoi dung nhap keyword thi loc blog theo keyword
     if (keyword.trim() != ""){
         options.where[Op.or]= {
                 title: { [Op.iLike]: `%${keyword.trim()}%` },
@@ -35,28 +41,22 @@ controller.showList = async (req, res) => {
         };
     }
 
-    
-    // res.locals.pagination = {
-    //     page,
-    //     limit,
-    //     totalRows,
-    //     queryParams: req.params,
-    // };
+    // Dem bao nhiu blog thoa dieu kien
+    let totalRows= await models.Blog.count({
+        ...options, 
+        distinct: true,
+        col: 'id'
+    });
+
+    res.locals.pagination = {
+        page,
+        limit,
+        totalRows,
+        queryParams: req.query,
+    };
 
 
-
-    let blogs = await models.Blog.findAll(options);
-    
-    
-    // select * from Blogs
-    // console.log(blogs);
-
-    // res.locals.categories = await models.Category.findAll(
-    //     {include: [
-    //         {model: models.Blog}
-    //     ]}
-    // );
-    // res.locals.tags = await models.Tag.findAll();
+    let blogs = await models.Blog.findAll({...options, limit, offset});
     res.locals.blogs = blogs;
     res.render('index');
 };
@@ -73,13 +73,6 @@ controller.showDetails =async(req, res) => {
 
         ],
     });
-    // res.locals.categories = await models.Category.findAll(
-    //     {include: [
-    //         {model: models.Blog}
-    //     ]}
-    // );
-    // res.locals.tags = await models.Tag.findAll();
-    // res.locals.blog =blog;
     res.render("details");
 };
 
